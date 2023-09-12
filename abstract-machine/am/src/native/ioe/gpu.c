@@ -2,7 +2,7 @@
 #include <SDL2/SDL.h>
 #include <fenv.h>
 
-//#define MODE_800x600
+#define MODE_800x600
 #ifdef MODE_800x600
 # define W    800
 # define H    600
@@ -29,7 +29,7 @@ static Uint32 texture_sync(Uint32 interval, void *param) {
 
 void __am_gpu_init() {
   SDL_Init(SDL_INIT_VIDEO | SDL_INIT_TIMER);
-  window = SDL_CreateWindow("Native Application",
+  window = SDL_CreateWindow("OS-LAB run on Native Applications",
       SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED,
 #ifdef MODE_800x600
       W, H,
