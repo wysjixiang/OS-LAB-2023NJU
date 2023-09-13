@@ -1,11 +1,18 @@
-NAME := $(shell basename $(PWD))
-export MODULE := M1
-all: $(NAME)-64 $(NAME)-32
-export AM_HOME := $(PWD)/../abstract-machine
-ifeq ($(ARCH),)
-export ARCH := native
-endif
 
+SRC := pstree
+OUT := pstree-native
 
-include ../Makefile
-include $(AM_HOME)/Makefile
+mainargs ?=
+
+.PHONY: make run clean
+
+DEFAULT_GOAL: make
+
+make:
+	gcc -o $(OUT) $(SRC).c
+
+run: make
+	./$(OUT) $(mainargs)
+
+clean:
+	rm $(OUT)
