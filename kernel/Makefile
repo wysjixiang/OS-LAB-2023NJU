@@ -8,5 +8,5 @@ export ARCH := native
 endif
 
 include $(AM_HOME)/Makefile
-include ../Makefile.lab
-image: git
+#include ../Makefile.lab
+#image: git
