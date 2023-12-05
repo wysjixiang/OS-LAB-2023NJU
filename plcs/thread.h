@@ -41,6 +41,7 @@ void join() {
       t->status = T_DEAD;
     }
   }
+  tptr = tpool;
 }
 
 __attribute__((destructor)) void cleanup() {
