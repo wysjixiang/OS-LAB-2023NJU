@@ -73,22 +73,22 @@ void draw_pic(int x, int y, int w, int h, uint32_t *pixel){
 }
 
 // Operating system is a C program!
-int main(const char *args) {
-  ioe_init();
+// int main(const char *args) {
+//   ioe_init();
 
-  puts("mainargs = \"");
-  puts(args);  // make run mainargs=xxx
-  puts("\"\n");
+//   puts("mainargs = \"");
+//   puts(args);  // make run mainargs=xxx
+//   puts("\"\n");
 
-  //splash();
+//   //splash();
 
-  // convert frame;
-  draw_pic(0,0,800,600,frame);
+//   // convert frame;
+//   draw_pic(0,0,800,600,frame);
 
-  puts("Press any key to see its key code...\n");
-  while (1) {
-    print_key();
-    sleep(0.5);
-  }
-  return 0;
-}
+//   puts("Press any key to see its key code...\n");
+//   while (1) {
+//     print_key();
+//     sleep(0.5);
+//   }
+//   return 0;
+// }
