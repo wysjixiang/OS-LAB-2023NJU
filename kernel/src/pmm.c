@@ -33,6 +33,21 @@ static void pmm_init() {
   mempool_assert_test();
 }
 
+#define MEM_ASSIGN(ptr,temp,base,cnt,num) do{ \
+  ptr = head_##base##_mem; \
+  addr = (void*)HEAD_##base##_BLOCK; \
+  for(int i =0; i < cnt -1; i++){ \
+    ptr->addr = addr; \
+    temp = ptr + 1; \
+    ptr->next = temp; \
+    ptr = temp; \
+    addr += num; \
+  } \
+  ptr->addr = addr; \
+  ptr->next = NULL; \
+} while(0)
+
+
 static int mempool_init(void){
   mempool *head_128_mem = (mempool*) HEAD_128_MEM;
   mempool *head_256_mem = (mempool*) HEAD_256_MEM;
@@ -42,94 +57,16 @@ static int mempool_init(void){
   mempool *head_4m_mem = (mempool*) HEAD_4m_MEM;
   mempool *head_16m_mem = (mempool*) HEAD_16m_MEM;
 
-  mempool *ptr = head_128_mem;
+  mempool *ptr;
   mempool *temp;
-  void *addr = (void*)HEAD_128_BLOCK;
-  for(int i = 0; i < 16*1024-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 128;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-  ptr = head_256_mem;
-  addr = (void*)HEAD_256_BLOCK;
-  for(int i = 0; i < 16*1024-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 256;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-  ptr = head_1k_mem;
-  addr = (void*)HEAD_1k_BLOCK;
-  for(int i = 0; i < 1*1024-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 1024;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-  ptr = head_4k_mem;
-  addr = (void*)HEAD_4k_BLOCK;
-  for(int i = 0; i < 16*1024-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 4*1024;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-
-
-  ptr = head_1m_mem;
-  addr = (void*)HEAD_1m_BLOCK;
-  for(int i = 0; i < 2-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 1*1024*1024;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-  ptr = head_4m_mem;
-  addr = (void*)HEAD_4m_BLOCK;
-  for(int i = 0; i < 4-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 4*1024*1024;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-  ptr = head_16m_mem;
-  addr = (void*)HEAD_16m_BLOCK;
-  for(int i = 0; i < 2-1; i++){
-    ptr->addr = addr;
-    temp = ptr + 1;
-    ptr->next = temp;
-    ptr = temp;
-    addr += 16*1024*1024;
-  }
-  ptr->addr = addr;
-  ptr->next = NULL;
-
-
+  void *addr;
+  MEM_ASSIGN(ptr,temp,128,16*1024,128);
+  MEM_ASSIGN(ptr,temp,256,16*1024,256);
+  MEM_ASSIGN(ptr,temp,1k,1*1024,1024);
+  MEM_ASSIGN(ptr,temp,4k,16*1024,4*1024);
+  MEM_ASSIGN(ptr,temp,1m,2,1*1024*1024);
+  MEM_ASSIGN(ptr,temp,4m,4,4*1024*1024);
+  MEM_ASSIGN(ptr,temp,16m,2,16*1024*1024);
   mempool_head_128.next = head_128_mem; 
   mempool_head_256.next = head_256_mem; 
   mempool_head_1k.next = head_1k_mem ;
@@ -137,7 +74,6 @@ static int mempool_init(void){
   mempool_head_1m.next = head_1m_mem ;
   mempool_head_4m.next = head_4m_mem ;
   mempool_head_16m.next = head_16m_mem; 
-
 
   return 0;
 
