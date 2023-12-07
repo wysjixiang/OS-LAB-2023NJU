@@ -4,27 +4,27 @@
 extern Area heap;
 
 
-#define __BLOCK_START (heap.start + 16*(16*1024+16*1024 + 1*1024 + 16*1024 + 2 + 4 + 2))
+#define __BLOCK_START ((uint64_t)heap.start + 16*(16*1024+16*1024 + 1*1024 + 16*1024 + 2 + 4 + 2))
+//  #define __BLOCK_START (0x10c4080)
 
-#define ALIGN(addr,num) ((uint64_t)addr % num == 0 ? addr : (((uint64_t)addr / num + 1) * num ))
-
-// #define MACRO_HEAD_BLOCK(num, addr)
-//     (#de##fine HEAD_##num##_BLOCK (addr))
-
-// #define MACRO_TAIL_BLOCK(num,addr) 
-//     (#define TAIL_##num##_BLOCK (addr))
-
-// #define MACRO_HEAP(num,start,bytes) 
-//     (#define _##num##_heap_start (start)) 
-//     (#define _##num##_heap_end (start + bytes))
+ #define ALIGN(addr,num) ((((uint64_t)(addr)) % ((uint64_t)(num)) == 0) ? ((uint64_t)(addr)) : (((((uint64_t)(addr)) / (uint64_t)(num)) + 1) * ((uint64_t)(num))))
+// #define ALIGN(addr, num) (addr)
 
 #define HEAD_128_BLOCK     (ALIGN(__BLOCK_START,128))
-#define HEAD_256_BLOCK     (ALIGN(HEAD_128_BLOCK+16*1024*128,256))
+// const uintptr_t HEAD_128_BLOCK = (ALIGN(__BLOCK_START,128));
+// const uintptr_t HEAD_256_BLOCK = (ALIGN(HEAD_128_BLOCK+16*1024*128,256));
+// #define HEAD_256_BLOCK     (ALIGN(HEAD_128_BLOCK+16*1024*128,256))
+#define HEAD_256_BLOCK     (ALIGN(HEAD_128_BLOCK + 16*1024*128,256))
 #define HEAD_1k_BLOCK    (ALIGN(HEAD_256_BLOCK + 16*1024*256,1024))
 #define HEAD_4k_BLOCK    (ALIGN(HEAD_1k_BLOCK + 1*1024*1*1024,4*1024))
-#define HEAD_1m_BLOCK    (ALIGN(HEAD_4k_BLOCK + 16*1024*1*1024,1*1024*1024))
-#define HEAD_4m_BLOCK    (ALIGN(HEAD_1m_BLOCK + 2*1024*1024,4*1024*1024))
-#define HEAD_16k_BLOCK    (ALIGN(HEAD_4m_BLOCK + 4*1024*1024,16*1024*1024))
+#define HEAD_1m_BLOCK    (ALIGN(HEAD_4k_BLOCK + 16*1024*4*1024,1*1024*1024))
+#define HEAD_4m_BLOCK    (ALIGN(HEAD_1m_BLOCK + 2*1*1024*1024,4*1024*1024))
+#define HEAD_16m_BLOCK    (ALIGN(HEAD_4m_BLOCK + 4*4*1024*1024,16*1024*1024))
+#define HEAD_END_BLOCK    (ALIGN(HEAD_16m_BLOCK + 2*16*1024*1024,1))
+
+
+
+
 
 // // macro for mempool table
 // MACRO_HEAP(128, ALIGN(__BLOCK_START,128), 16*1024*128)
@@ -63,14 +63,14 @@ extern Area heap;
 #define HEAD_1k_MEM (HEAD_256_MEM + 16*1024*16)
 #define HEAD_4k_MEM (HEAD_1k_MEM + 1*1024*16)
 #define HEAD_1m_MEM (HEAD_4k_MEM + 16*1024*16)
-#define HEAD_4m_MEM (HEAD_1k_MEM + 2*16)
-#define HEAD_16m_MEM (HEAD_4k_MEM + 4*16)
+#define HEAD_4m_MEM (HEAD_1m_MEM + 2*16)
+#define HEAD_16m_MEM (HEAD_4m_MEM + 4*16)
 
 
 // 16 Bytes
 typedef struct mempool {
     void* addr;
-    mempool *next;
+    struct mempool *next;
 } mempool;
 
 // 16 Bytes
@@ -82,9 +82,9 @@ typedef struct mempool_head {
 
 } mempool_head;
 
-#define MEMPOOL_HEAD(num,room) \
-    mempool_head mempool_head_##num { \
-        .room = room, \
+#define MEMPOOL_HEAD(num,rom) \
+    mempool_head mempool_head_##num = { \
+        .room = rom, \
         .used = 0, \
         .next = NULL,  \
     }
