@@ -7,13 +7,9 @@ extern Area heap;
 #define __BLOCK_START ((uint64_t)heap.start + 16*(16*1024+16*1024 + 1*1024 + 16*1024 + 2 + 4 + 2))
 //  #define __BLOCK_START (0x10c4080)
 
- #define ALIGN(addr,num) ((((uint64_t)(addr)) % ((uint64_t)(num)) == 0) ? ((uint64_t)(addr)) : (((((uint64_t)(addr)) / (uint64_t)(num)) + 1) * ((uint64_t)(num))))
-// #define ALIGN(addr, num) (addr)
+#define ALIGN(addr,num) ((((uint64_t)(addr)) % ((uint64_t)(num)) == 0) ? ((uint64_t)(addr)) : (((((uint64_t)(addr)) / (uint64_t)(num)) + 1) * ((uint64_t)(num))))
 
 #define HEAD_128_BLOCK     (ALIGN(__BLOCK_START,128))
-// const uintptr_t HEAD_128_BLOCK = (ALIGN(__BLOCK_START,128));
-// const uintptr_t HEAD_256_BLOCK = (ALIGN(HEAD_128_BLOCK+16*1024*128,256));
-// #define HEAD_256_BLOCK     (ALIGN(HEAD_128_BLOCK+16*1024*128,256))
 #define HEAD_256_BLOCK     (ALIGN(HEAD_128_BLOCK + 16*1024*128,256))
 #define HEAD_1k_BLOCK    (ALIGN(HEAD_256_BLOCK + 16*1024*256,1024))
 #define HEAD_4k_BLOCK    (ALIGN(HEAD_1k_BLOCK + 1*1024*1*1024,4*1024))
@@ -21,19 +17,6 @@ extern Area heap;
 #define HEAD_4m_BLOCK    (ALIGN(HEAD_1m_BLOCK + 2*1*1024*1024,4*1024*1024))
 #define HEAD_16m_BLOCK    (ALIGN(HEAD_4m_BLOCK + 4*4*1024*1024,16*1024*1024))
 #define HEAD_END_BLOCK    (ALIGN(HEAD_16m_BLOCK + 2*16*1024*1024,1))
-
-
-
-
-
-// // macro for mempool table
-// MACRO_HEAP(128, ALIGN(__BLOCK_START,128), 16*1024*128)
-// MACRO_HEAP(256, ALIGN(_128_heap_end,256), 16*1024*256)
-// MACRO_HEAP(1k, ALIGN(_256_heap_end,1024), 1*1024*1*1024)
-// MACRO_HEAP(4k, ALIGN(_1k_heap_end,(4*1024)), 16*1024*4*1024)
-// MACRO_HEAP(1m, ALIGN(_4k_heap_end,(1024*1024)), 2*1*1024*1024)
-// MACRO_HEAP(4m, ALIGN(_1m_heap_end,(4*1024*1024)), 4*4*1024*1024)
-// MACRO_HEAP(16m, ALIGN(_4m_heap_end,(16*1024*1024)), 2*16*1024*1024)
 
 // ---------------
 // after below macro process, we can get:

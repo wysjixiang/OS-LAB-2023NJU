@@ -11,7 +11,6 @@ static void mempool_assert_test(void);
 static void mempool_test(void);
 
 
-
 static void pmm_init() {
   uintptr_t pmsize = ((uintptr_t)heap.end - (uintptr_t)heap.start);
   printf("Got %d MiB heap: [%p, %p)\n", pmsize >> 20, heap.start, heap.end);
@@ -29,8 +28,8 @@ static void pmm_init() {
   printf("end_block = %p\n", HEAD_END_BLOCK);
 
 // ----------
-// assertion test for mempool range alignment
-  mempool_assert_test();
+// test for mempool 
+  mempool_test();
 }
 
 #define MEM_ASSIGN(ptr,temp,base,cnt,num) do{ \
@@ -123,14 +122,57 @@ static void *kalloc(size_t size) {
   return NULL;
 }
 
+
+#define MEM_FREE(ptr,mem_table,temp,dif,base,mem_size) do{ \
+  dif = (uint64_t)(ptr - HEAD_##base##_BLOCK); \
+  dif = dif/(mem_size); \
+  mem_table = (mempool*)(dif *(sizeof(mempool)) + HEAD_##base##_MEM); \
+  temp = mempool_head_##base.next; \
+  mempool_head_##base.next = mem_table; \
+  mem_table->next = temp; \
+  mempool_head_##base.used -= 1; \
+  return; \
+} while(0)
+
+
 static void kfree(void *ptr) {
+  
+  uint64_t dif;
+  mempool *mem_table;
+  mempool *temp;
+
+  if(ptr >= (void*)HEAD_128_BLOCK && ptr < (void*)HEAD_256_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,128,128);
+
+  } else if(ptr >= (void*)HEAD_256_BLOCK && ptr < (void*)HEAD_1k_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,256,256);
+
+  } else if(ptr >= (void*)HEAD_1k_BLOCK && ptr < (void*)HEAD_4k_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,1k,1024);
+    
+  } else if(ptr >= (void*)HEAD_4k_BLOCK && ptr < (void*)HEAD_1m_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,4k,4*1024);
+
+  } else if(ptr >= (void*)HEAD_1m_BLOCK && ptr < (void*)HEAD_4m_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,1m,1*1024*1024);
+
+  } else if(ptr >= (void*)HEAD_4m_BLOCK && ptr < (void*)HEAD_16m_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,4m,4*1024*1024);
+
+  } else if(ptr >= (void*)HEAD_16m_BLOCK && ptr < (void*)HEAD_END_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,16m,16*1024*1024);
+
+  } else{
+    printf("The ptr:%p you want free is illegal\n",ptr);
+    assert(0);
+  }
+
 }
 
 #define MEM_KALLOC_TEST(num,addr,cnt,base,test_cnt) do{ \
   cnt = 0; \
   addr = heap.start; \
   while((addr = kalloc(num)) != NULL){ \
-    printf("Kalloc addr= %p\n",addr); \
     assert(addr == (void*)(cnt*(num) + HEAD_##base##_BLOCK)); \
     cnt ++; \
   } \
@@ -141,6 +183,9 @@ static void kfree(void *ptr) {
 static void mempool_test(void){
   void *addr;
   uint32_t cnt;
+
+  mempool_assert_test();
+
   MEM_KALLOC_TEST(128,addr,cnt,128,16*1024);
   MEM_KALLOC_TEST(256,addr,cnt,256,16*1024);
   MEM_KALLOC_TEST(1024,addr,cnt,1k,1*1024);
@@ -149,8 +194,14 @@ static void mempool_test(void){
   MEM_KALLOC_TEST(4*1024*1024,addr,cnt,4m,4);
   MEM_KALLOC_TEST(16*1024*1024,addr,cnt,16m,2);
 
-}
 
+  void *ptr = (void*)HEAD_128_BLOCK;
+  for(int i = 0;i <  16*1024;i++){
+    kfree(ptr);
+    ptr += 128;
+  }
+
+}
 
 static void mempool_assert_test(void){
   assert(HEAD_128_BLOCK % 128 == 0);
@@ -166,9 +217,6 @@ static void mempool_assert_test(void){
   assert(HEAD_1m_BLOCK  - HEAD_4k_BLOCK    >= 16*1024*4*1024  );
   assert(HEAD_4m_BLOCK  - HEAD_1m_BLOCK    >= 2*1024*1024  );
   assert(HEAD_16m_BLOCK - HEAD_4m_BLOCK    >= 4*4*1024*1024  ); 
-
-
-  mempool_test();
 
 }
 
