@@ -78,12 +78,17 @@ static int mempool_init(void){
 
 }
 
-#define MEMPOOL_KALLOC(num,temp,addr) do{ \
+#define MEMPOOL_KALLOC(num,temp,addr,mem_size) do{ \
   temp = mempool_head_##num.next; \
   if(temp != NULL) { \
     mempool_head_##num.next = temp->next; \
     mempool_head_##num.used += 1; \
     addr = temp->addr; \
+    temp->used = 1; \
+    uint64_t *start = (uint64_t*)addr; \
+    for(int j = 0; j < ((mem_size) >> 3); j++){ \
+      *start++ = 0; \
+    } \
     return addr; \
   } else{ \
     printf("OOM!\n"); \
@@ -96,23 +101,23 @@ static void *kalloc(size_t size) {
   mempool *temp;
   static void *addr = NULL;
   if(size <= 128){
-    MEMPOOL_KALLOC(128,temp,addr);
+    MEMPOOL_KALLOC(128,temp,addr,128);
   } else if(size <= 256){
-    MEMPOOL_KALLOC(256,temp,addr);
+    MEMPOOL_KALLOC(256,temp,addr,256);
   } else if(size <= 1024){
-    MEMPOOL_KALLOC(1k,temp,addr);
+    MEMPOOL_KALLOC(1k,temp,addr,1024);
 
   } else if(size <= 4*1024){
-    MEMPOOL_KALLOC(4k,temp,addr);
+    MEMPOOL_KALLOC(4k,temp,addr,4*1024);
 
   } else if(size <= 1*1024*1024){
-    MEMPOOL_KALLOC(1m,temp,addr);
+    MEMPOOL_KALLOC(1m,temp,addr,1*1024*1024);
 
   } else if(size <= 4*1024*1024){
-    MEMPOOL_KALLOC(4m,temp,addr);
+    MEMPOOL_KALLOC(4m,temp,addr,4*1024*1024);
 
   } else if(size <= 16*1024*1024){
-    MEMPOOL_KALLOC(16m,temp,addr);
+    MEMPOOL_KALLOC(16m,temp,addr,16*1024*1024);
 
   } else{
     printf("Kalloc mem size over maximun 16M, cannot meet the demand\n");
@@ -127,6 +132,11 @@ static void *kalloc(size_t size) {
   dif = (uint64_t)(ptr - HEAD_##base##_BLOCK); \
   dif = dif/(mem_size); \
   mem_table = (mempool*)(dif *(sizeof(mempool)) + HEAD_##base##_MEM); \
+  if(mem_table->used != 1){ \
+    printf("The mem:%p you want free is already released!\n",mem_table->addr); \
+    assert(0); \
+  } \
+  mem_table->used = 0; \
   temp = mempool_head_##base.next; \
   mempool_head_##base.next = mem_table; \
   mem_table->next = temp; \
@@ -200,6 +210,8 @@ static void mempool_test(void){
     kfree(ptr);
     ptr += 128;
   }
+  ptr = (void*)HEAD_128_BLOCK;
+  kfree(ptr);
 
 }
 

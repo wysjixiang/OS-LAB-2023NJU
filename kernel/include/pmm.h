@@ -2,9 +2,9 @@
 #define __PMM_H__
 
 extern Area heap;
+#define MEM_TABLE_SIZE 24
 
-
-#define __BLOCK_START ((uint64_t)heap.start + 16*(16*1024+16*1024 + 1*1024 + 16*1024 + 2 + 4 + 2))
+#define __BLOCK_START ((uint64_t)heap.start + MEM_TABLE_SIZE*(16*1024+16*1024 + 1*1024 + 16*1024 + 2 + 4 + 2))
 //  #define __BLOCK_START (0x10c4080)
 
 #define ALIGN(addr,num) ((((uint64_t)(addr)) % ((uint64_t)(num)) == 0) ? ((uint64_t)(addr)) : (((((uint64_t)(addr)) / (uint64_t)(num)) + 1) * ((uint64_t)(num))))
@@ -42,17 +42,18 @@ extern Area heap;
 
 // handle the header structure
 #define HEAD_128_MEM (heap.start)
-#define HEAD_256_MEM (HEAD_128_MEM + 16*1024*16)
-#define HEAD_1k_MEM (HEAD_256_MEM + 16*1024*16)
-#define HEAD_4k_MEM (HEAD_1k_MEM + 1*1024*16)
-#define HEAD_1m_MEM (HEAD_4k_MEM + 16*1024*16)
-#define HEAD_4m_MEM (HEAD_1m_MEM + 2*16)
-#define HEAD_16m_MEM (HEAD_4m_MEM + 4*16)
+#define HEAD_256_MEM (HEAD_128_MEM + 16*1024*MEM_TABLE_SIZE)
+#define HEAD_1k_MEM (HEAD_256_MEM + 16*1024*MEM_TABLE_SIZE)
+#define HEAD_4k_MEM (HEAD_1k_MEM + 1*1024*MEM_TABLE_SIZE)
+#define HEAD_1m_MEM (HEAD_4k_MEM + 16*1024*MEM_TABLE_SIZE)
+#define HEAD_4m_MEM (HEAD_1m_MEM + 2*MEM_TABLE_SIZE)
+#define HEAD_16m_MEM (HEAD_4m_MEM + 4*MEM_TABLE_SIZE)
 
 
-// 16 Bytes
+// 24 Bytes
 typedef struct mempool {
     void* addr;
+    int used;
     struct mempool *next;
 } mempool;
 
