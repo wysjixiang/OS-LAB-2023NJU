@@ -127,9 +127,12 @@ static void *kalloc(size_t size) {
   return NULL;
 }
 
-
 #define MEM_FREE(ptr,mem_table,temp,dif,base,mem_size) do{ \
   dif = (uint64_t)(ptr - HEAD_##base##_BLOCK); \
+  if( dif % (mem_size)){ \
+    printf("The mem: %p you want free is unaligned! Align size:%d\n",ptr,(mem_size)); \
+    assert(0); \
+  } \
   dif = dif/(mem_size); \
   mem_table = (mempool*)(dif *(sizeof(mempool)) + HEAD_##base##_MEM); \
   if(mem_table->used != 1){ \
@@ -143,7 +146,6 @@ static void *kalloc(size_t size) {
   mempool_head_##base.used -= 1; \
   return; \
 } while(0)
-
 
 static void kfree(void *ptr) {
   
@@ -210,7 +212,7 @@ static void mempool_test(void){
     kfree(ptr);
     ptr += 128;
   }
-  ptr = (void*)HEAD_128_BLOCK;
+  ptr = (void*)(HEAD_128_BLOCK+1);
   kfree(ptr);
 
 }
