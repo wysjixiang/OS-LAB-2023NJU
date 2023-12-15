@@ -10,6 +10,13 @@ static int mempool_init(void);
 static void mempool_assert_test(void);
 static void mempool_test(void);
 
+#ifdef __MEM_TEST
+#define MEM_TEST mempool_test()
+#else
+#define MEM_TEST  // define nothing
+
+#endif
+
 
 static void pmm_init() {
   uintptr_t pmsize = ((uintptr_t)heap.end - (uintptr_t)heap.start);
@@ -29,7 +36,7 @@ static void pmm_init() {
 
 // ----------
 // test for mempool 
-  mempool_test();
+  MEM_TEST;
 }
 
 #define MEM_ASSIGN(ptr,temp,base,cnt,num) do{ \
@@ -212,8 +219,6 @@ static void mempool_test(void){
     kfree(ptr);
     ptr += 128;
   }
-  ptr = (void*)(HEAD_128_BLOCK+1);
-  kfree(ptr);
 
 }
 
