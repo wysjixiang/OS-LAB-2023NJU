@@ -1,6 +1,24 @@
 #include <common.h>
 #include "pmm.h"
 
+spinlock_t alloc_lock = {
+  .value = 0,
+};
+spinlock_t free_lock = {
+  .value = 0,
+};
+static void spin_lock(spinlock_t *lk) {
+  while (1) {
+    intptr_t value = atomic_xchg(&lk->value, 1);
+    if (value == 0) {
+      break;
+    }
+  }
+}
+static void spin_unlock(spinlock_t *lk) {
+  atomic_xchg(&lk->value, 0);
+}
+
 static void *kalloc(size_t size);
 static void kfree(void *ptr);
 
@@ -85,10 +103,12 @@ static int mempool_init(void){
 }
 
 #define MEMPOOL_KALLOC(num,temp,addr,mem_size) do{ \
+  spin_lock(&allock_lock); \
   temp = mempool_head_##num.next; \
   if(temp != NULL) { \
     mempool_head_##num.next = temp->next; \
     mempool_head_##num.used += 1; \
+    spin_unlock(&allock_lock); \
     addr = temp->addr; \
     temp->used = 1; \
     uint64_t *start = (uint64_t*)addr; \
@@ -97,6 +117,7 @@ static int mempool_init(void){
     } \
     return addr; \
   } else{ \
+    spin_unlock(&allock_lock); \
     printf("OOM!\n"); \
     return NULL; \
   } \
@@ -145,11 +166,13 @@ static void *kalloc(size_t size) {
     printf("The mem:%p you want free is already released!\n",mem_table->addr); \
     assert(0); \
   } \
+  spin_lock(&free_lock); \
   mem_table->used = 0; \
   temp = mempool_head_##base.next; \
   mempool_head_##base.next = mem_table; \
   mem_table->next = temp; \
   mempool_head_##base.used -= 1; \
+  spin_unlock(&free_lock); \
   return; \
 } while(0)
 
