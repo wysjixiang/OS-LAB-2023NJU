@@ -1,26 +1,33 @@
 #include <common.h>
 #include "pmm.h"
 
-spinlock_t alloc_lock = {
-  .value = 0,
+static spinlock_t alloc_lock = {
+  .lock = 0,
+  .cpu = -1,
+  .name = "alloc_lock",
 };
-spinlock_t free_lock = {
-  .value = 0,
+static spinlock_t free_lock = {
+  .lock = 0,
+  .cpu = -1,
+  .name = "free_lock",
 };
+
 static void spin_lock(spinlock_t *lk) {
   while (1) {
-    intptr_t value = atomic_xchg(&lk->value, 1);
+    intptr_t value = atomic_xchg(&lk->lock, 1);
     if (value == 0) {
       break;
     }
   }
 }
 static void spin_unlock(spinlock_t *lk) {
-  atomic_xchg(&lk->value, 0);
+  atomic_xchg(&lk->lock, 0);
 }
 
 static void *kalloc(size_t size);
 static void kfree(void *ptr);
+static void *kalloc_safe(size_t size);
+static void kfree_safe(void *ptr);
 
 // mempool init
 static int mempool_init(void);
@@ -53,7 +60,7 @@ static void pmm_init() {
 
 // ----------
 // test for mempool 
-  mempool_test();
+  MEM_TEST;
 }
 
 #define MEM_ASSIGN(ptr,temp,base,cnt,num) do{ \
@@ -87,7 +94,7 @@ static int mempool_init(void){
   MEM_ASSIGN(ptr,temp,256,16*1024,256);
   MEM_ASSIGN(ptr,temp,1k,1*1024,1024);
   MEM_ASSIGN(ptr,temp,4k,16*1024,4*1024);
-  MEM_ASSIGN(ptr,temp,1m,2,1*1024*1024);
+  MEM_ASSIGN(ptr,temp,1m,4,1*1024*1024);
   MEM_ASSIGN(ptr,temp,4m,4,4*1024*1024);
   MEM_ASSIGN(ptr,temp,16m,2,16*1024*1024);
   mempool_head_128.next = head_128_mem; 
@@ -103,12 +110,12 @@ static int mempool_init(void){
 }
 
 #define MEMPOOL_KALLOC(num,temp,addr,mem_size) do{ \
-  spin_lock(&allock_lock); \
+  spin_lock(&alloc_lock); \
   temp = mempool_head_##num.next; \
   if(temp != NULL) { \
     mempool_head_##num.next = temp->next; \
     mempool_head_##num.used += 1; \
-    spin_unlock(&allock_lock); \
+    spin_unlock(&alloc_lock); \
     addr = temp->addr; \
     temp->used = 1; \
     uint64_t *start = (uint64_t*)addr; \
@@ -117,14 +124,23 @@ static int mempool_init(void){
     } \
     return addr; \
   } else{ \
-    spin_unlock(&allock_lock); \
-    printf("OOM!\n"); \
+    spin_unlock(&alloc_lock); \
+    printf("OOM! mem_size request:%d\n",(int)mem_size); \
     return NULL; \
   } \
 } while(0)
 
-static void *kalloc(size_t size) {
+static void *kalloc_safe(size_t size){
+  bool i = ienabled(); // save last interrupt flag
+  iset(false); 
+  void *ret = kalloc(size);
+  if(i) iset(true); // restore interrupt flag
+  return ret;
+}
 
+
+
+static void *kalloc(size_t size) {
   mempool *temp;
   static void *addr = NULL;
   if(size <= 128){
@@ -175,6 +191,15 @@ static void *kalloc(size_t size) {
   spin_unlock(&free_lock); \
   return; \
 } while(0)
+
+static void kfree_safe(void *ptr){
+  bool i = ienabled();
+  iset(false);
+  kfree(ptr);
+  if(i) iset(true);
+}
+
+
 
 static void kfree(void *ptr) {
   
@@ -265,6 +290,6 @@ static void mempool_assert_test(void){
 
 MODULE_DEF(pmm) = {
   .init  = pmm_init,
-  .alloc = kalloc,
-  .free  = kfree,
+  .alloc = kalloc_safe,
+  .free  = kfree_safe,
 };

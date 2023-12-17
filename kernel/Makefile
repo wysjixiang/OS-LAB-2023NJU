@@ -1,9 +1,10 @@
-NAME := pmm
+NAME := KMT
 SRCS := $(wildcard src/*.c)
+SRCS += $(wildcard src/dev/*.c)
 SRCS += $(wildcard framework/*.c)
 
 
-export MODULE  := L1
+export MODULE  := L2
 export AM_HOME := $(PWD)/../abstract-machine
 ifeq ($(ARCH),)
 #export ARCH := x86_64-qemu

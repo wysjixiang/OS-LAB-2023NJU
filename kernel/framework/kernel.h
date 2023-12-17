@@ -1,3 +1,7 @@
+#ifndef __KERNEL_H__
+#define __KERNEL_H__
+
+
 #include <am.h>
 
 #define MODULE(mod) \
@@ -22,6 +26,11 @@
 
 */
 
+#ifdef NO_DEBUG
+#define DEBUG_PRINTF(M,...) //
+#else
+#define DEBUG_PRINTF(M,...) printf("DEBUG %s:%s:%d: " M "\n", __FILE__, __FUNCTION__,  __LINE__, ##__VA_ARGS__)
+#endif
 
 
 
@@ -59,3 +68,5 @@ MODULE(dev) {
   void (*init)();
   device_t *(*lookup)(const char *name);
 };
+
+#endif

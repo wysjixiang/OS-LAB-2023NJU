@@ -198,6 +198,9 @@ static void welcome(device_t *dev) {
 }
 
 static int tty_init(device_t *ttydev) {
+
+  DEBUG_PRINTF("tty init");
+
   tty_t *tty = ttydev->ptr;
   tty->fbdev = dev->lookup("fb");
   fb_t *fb = tty->fbdev->ptr;
@@ -219,7 +222,14 @@ static int tty_init(device_t *ttydev) {
   q->end = q->buf + TTY_COOK_BUF_SZ;
   kmt->sem_init(&tty->lock, "tty lock", 1);
   kmt->sem_init(&tty->cooked, "tty cooked lines", 0);
+  
+  DEBUG_PRINTF("tty sem init end");
+
   welcome(ttydev);
+
+  DEBUG_PRINTF("tty init end");
+
+
   return 0;
 }
 

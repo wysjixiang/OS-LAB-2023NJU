@@ -24,6 +24,9 @@ static void font_load(fb_t *fb, uint8_t *font) {
 }
 
 int fb_init(device_t *dev) {
+
+  DEBUG_PRINTF("fb_init");
+
   fb_t *fb = dev->ptr;
   fb->info = pmm->alloc(sizeof(struct display_info));
   fb->textures = pmm->alloc(sizeof(struct texture) * NTEXTURE);
@@ -38,6 +41,9 @@ int fb_init(device_t *dev) {
   };
   kmt->sem_init(&fb_sem, dev->name, 1);
   font_load(fb, term_font);
+
+  DEBUG_PRINTF("fb_init end");
+
   return 0;
 }
 
