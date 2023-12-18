@@ -2,7 +2,7 @@ NAME := KMT
 SRCS := $(wildcard src/*.c)
 SRCS += $(wildcard src/dev/*.c)
 SRCS += $(wildcard framework/*.c)
-
+#CFLAGS += -D__MEM_TEST
 
 export MODULE  := L2
 export AM_HOME := $(PWD)/../abstract-machine

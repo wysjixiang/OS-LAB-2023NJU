@@ -32,6 +32,12 @@
 #define DEBUG_PRINTF(M,...) printf("DEBUG %s:%s:%d: " M "\n", __FILE__, __FUNCTION__,  __LINE__, ##__VA_ARGS__)
 #endif
 
+#define assert_info(cond,M,...) do{ \
+  if(!(cond)){ \
+    printf(" assert_info: %s:%s:%d: " M "\n", __FILE__, __FUNCTION__,  __LINE__, ##__VA_ARGS__); \
+    halt(1);  \
+  } \
+} while(0)
 
 
 typedef Context *(*handler_t)(Event, Context *);

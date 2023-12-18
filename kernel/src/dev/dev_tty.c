@@ -208,9 +208,18 @@ static int tty_init(device_t *ttydev) {
   tty->lines = fb->info->height / 16;
   tty->columns = fb->info->width / 8;
   tty->size = tty->columns * tty->lines;
+
+  DEBUG_PRINTF("alloc size: %d", tty->size * sizeof(tty->buf[0]));
+
   tty->buf = pmm->alloc(tty->size * sizeof(tty->buf[0]));
+
+  DEBUG_PRINTF("alloc size: %d", tty->size * sizeof(tty->dirty[0]));
+
   tty->dirty = pmm->alloc(tty->size * sizeof(tty->dirty[0]));
   tty->end = tty->buf + tty->size;
+
+  DEBUG_PRINTF("alloc size: %d",tty->size * 2 * sizeof(struct sprite));
+
   tty->sp_buf = pmm->alloc(tty->size * 2 * sizeof(struct sprite));
   for (int i = 0; i < tty->size; i++) {
     tty->buf[i] = tty_defaultch();

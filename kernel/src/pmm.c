@@ -36,7 +36,10 @@ static void mempool_assert_test(void);
 static void mempool_test(void);
 
 #ifdef __MEM_TEST
-#define MEM_TEST mempool_test()
+#define MEM_TEST do { \
+  mempool_test(); \
+  while(1); \
+} while(0)
 #else
 #define MEM_TEST  // define nothing
 
@@ -53,6 +56,8 @@ static void pmm_init() {
   printf("256_block = %p\n", HEAD_256_BLOCK);
   printf("1k_block = %p\n", HEAD_1k_BLOCK);
   printf("4k_block = %p\n", HEAD_4k_BLOCK);
+  printf("8k_block = %p\n", HEAD_8k_BLOCK);
+  printf("64k_block = %p\n", HEAD_64k_BLOCK);
   printf("1m_block = %p\n", HEAD_1m_BLOCK);
   printf("4m_block = %p\n", HEAD_4m_BLOCK);
   printf("16m_block = %p\n", HEAD_16m_BLOCK);
@@ -79,10 +84,24 @@ static void pmm_init() {
 
 
 static int mempool_init(void){
+
+  HEAD_128_BLOCK =    (ALIGN(__BLOCK_START,128)) ;
+  HEAD_256_BLOCK =   (ALIGN(HEAD_128_BLOCK + 16*1024*128,256));
+  HEAD_1k_BLOCK  =  (ALIGN(HEAD_256_BLOCK + 16*1024*256,1024));
+  HEAD_4k_BLOCK  =  (ALIGN(HEAD_1k_BLOCK + 1*1024*1*1024,4*1024));
+  HEAD_8k_BLOCK  =  (ALIGN(HEAD_4k_BLOCK + 4*1024*4*1024,8*1024));
+  HEAD_64k_BLOCK  =  (ALIGN(HEAD_8k_BLOCK + 4*1024*8*1024,64*1024));
+  HEAD_1m_BLOCK  =  (ALIGN(HEAD_64k_BLOCK + 128*64*1024,1*1024*1024));
+  HEAD_4m_BLOCK  =  (ALIGN(HEAD_1m_BLOCK + 4*1*1024*1024,4*1024*1024));
+  HEAD_16m_BLOCK  =  (ALIGN(HEAD_4m_BLOCK + 4*4*1024*1024,16*1024*1024));
+  HEAD_END_BLOCK  = (ALIGN(HEAD_16m_BLOCK + 2*16*1024*1024,1));
+
   mempool *head_128_mem = (mempool*) HEAD_128_MEM;
   mempool *head_256_mem = (mempool*) HEAD_256_MEM;
   mempool *head_1k_mem = (mempool*) HEAD_1k_MEM;
   mempool *head_4k_mem = (mempool*) HEAD_4k_MEM;
+  mempool *head_8k_mem = (mempool*) HEAD_8k_MEM;
+  mempool *head_64k_mem = (mempool*) HEAD_64k_MEM;
   mempool *head_1m_mem = (mempool*) HEAD_1m_MEM;
   mempool *head_4m_mem = (mempool*) HEAD_4m_MEM;
   mempool *head_16m_mem = (mempool*) HEAD_16m_MEM;
@@ -93,14 +112,18 @@ static int mempool_init(void){
   MEM_ASSIGN(ptr,temp,128,16*1024,128);
   MEM_ASSIGN(ptr,temp,256,16*1024,256);
   MEM_ASSIGN(ptr,temp,1k,1*1024,1024);
-  MEM_ASSIGN(ptr,temp,4k,16*1024,4*1024);
-  MEM_ASSIGN(ptr,temp,1m,4,1*1024*1024);
+  MEM_ASSIGN(ptr,temp,4k,4*1024,4*1024);
+  MEM_ASSIGN(ptr,temp,8k,4*1024,8*1024);
+  MEM_ASSIGN(ptr,temp,64k,128,64*1024);
+  MEM_ASSIGN(ptr,temp,1m,2,1*1024*1024);
   MEM_ASSIGN(ptr,temp,4m,4,4*1024*1024);
   MEM_ASSIGN(ptr,temp,16m,2,16*1024*1024);
   mempool_head_128.next = head_128_mem; 
   mempool_head_256.next = head_256_mem; 
   mempool_head_1k.next = head_1k_mem ;
   mempool_head_4k.next = head_4k_mem ;
+  mempool_head_8k.next = head_8k_mem ;
+  mempool_head_64k.next = head_64k_mem ;
   mempool_head_1m.next = head_1m_mem ;
   mempool_head_4m.next = head_4m_mem ;
   mempool_head_16m.next = head_16m_mem; 
@@ -152,6 +175,12 @@ static void *kalloc(size_t size) {
 
   } else if(size <= 4*1024){
     MEMPOOL_KALLOC(4k,temp,addr,4*1024);
+
+  } else if(size <= 8*1024){
+    MEMPOOL_KALLOC(8k,temp,addr,8*1024);
+
+  } else if(size <= 64*1024){
+    MEMPOOL_KALLOC(64k,temp,addr,64*1024);
 
   } else if(size <= 1*1024*1024){
     MEMPOOL_KALLOC(1m,temp,addr,1*1024*1024);
@@ -216,8 +245,14 @@ static void kfree(void *ptr) {
   } else if(ptr >= (void*)HEAD_1k_BLOCK && ptr < (void*)HEAD_4k_BLOCK){
     MEM_FREE(ptr,mem_table,temp,dif,1k,1024);
     
-  } else if(ptr >= (void*)HEAD_4k_BLOCK && ptr < (void*)HEAD_1m_BLOCK){
+  } else if(ptr >= (void*)HEAD_4k_BLOCK && ptr < (void*)HEAD_8k_BLOCK){
     MEM_FREE(ptr,mem_table,temp,dif,4k,4*1024);
+
+  } else if(ptr >= (void*)HEAD_8k_BLOCK && ptr < (void*)HEAD_64k_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,8k,8*1024);
+
+  } else if(ptr >= (void*)HEAD_64k_BLOCK && ptr < (void*)HEAD_1m_BLOCK){
+    MEM_FREE(ptr,mem_table,temp,dif,64k,64*1024);
 
   } else if(ptr >= (void*)HEAD_1m_BLOCK && ptr < (void*)HEAD_4m_BLOCK){
     MEM_FREE(ptr,mem_table,temp,dif,1m,1*1024*1024);
@@ -239,7 +274,7 @@ static void kfree(void *ptr) {
   cnt = 0; \
   addr = heap.start; \
   while((addr = kalloc(num)) != NULL){ \
-    assert(addr == (void*)(cnt*(num) + HEAD_##base##_BLOCK)); \
+    assert_info(addr == (void*)(cnt*(num) + HEAD_##base##_BLOCK), "addr = %p",addr); \
     cnt ++; \
   } \
   assert(cnt == test_cnt); \
@@ -255,7 +290,9 @@ static void mempool_test(void){
   MEM_KALLOC_TEST(128,addr,cnt,128,16*1024);
   MEM_KALLOC_TEST(256,addr,cnt,256,16*1024);
   MEM_KALLOC_TEST(1024,addr,cnt,1k,1*1024);
-  MEM_KALLOC_TEST(4*1024,addr,cnt,4k,16*1024);
+  MEM_KALLOC_TEST(4*1024,addr,cnt,4k,4*1024);
+  MEM_KALLOC_TEST(8*1024,addr,cnt,8k,4*1024);
+  MEM_KALLOC_TEST(64*1024,addr,cnt,64k,128);
   MEM_KALLOC_TEST(1*1024*1024,addr,cnt,1m,2);
   MEM_KALLOC_TEST(4*1024*1024,addr,cnt,4m,4);
   MEM_KALLOC_TEST(16*1024*1024,addr,cnt,16m,2);
@@ -276,13 +313,17 @@ static void mempool_assert_test(void){
   assert(HEAD_256_BLOCK % 256 == 0);
   assert(HEAD_1k_BLOCK % 1024 == 0);
   assert(HEAD_4k_BLOCK % (4*1024) == 0);
+  assert(HEAD_8k_BLOCK % (8*1024) == 0);
+  assert(HEAD_64k_BLOCK % (64*1024) == 0);
   assert(HEAD_1m_BLOCK % (1*1024*1024) == 0);
   assert(HEAD_4m_BLOCK % (4*1024*1024) == 0);
   assert(HEAD_16m_BLOCK % (16*1024*1024) == 0);
   assert(HEAD_256_BLOCK - __BLOCK_START    >= 16*1024*128); 
   assert(HEAD_1k_BLOCK - HEAD_256_BLOCK    >= 16*1024*256  ); 
   assert(HEAD_4k_BLOCK  -  HEAD_1k_BLOCK   >= 1*1024*1*1024  );
-  assert(HEAD_1m_BLOCK  - HEAD_4k_BLOCK    >= 16*1024*4*1024  );
+  assert(HEAD_8k_BLOCK  - HEAD_4k_BLOCK    >= 4*1024*4*1024  );
+  assert(HEAD_64k_BLOCK  - HEAD_8k_BLOCK    >= 4*1024*8*1024  );
+  assert(HEAD_1m_BLOCK  - HEAD_64k_BLOCK    >= 128*64*1024  );
   assert(HEAD_4m_BLOCK  - HEAD_1m_BLOCK    >= 2*1024*1024  );
   assert(HEAD_16m_BLOCK - HEAD_4m_BLOCK    >= 4*4*1024*1024  ); 
 
