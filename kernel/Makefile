@@ -1,4 +1,4 @@
-NAME := KMT
+NAME := kmt
 SRCS := $(wildcard src/*.c)
 SRCS += $(wildcard src/dev/*.c)
 SRCS += $(wildcard framework/*.c)

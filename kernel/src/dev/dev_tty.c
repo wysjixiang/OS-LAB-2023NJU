@@ -198,9 +198,6 @@ static void welcome(device_t *dev) {
 }
 
 static int tty_init(device_t *ttydev) {
-
-  DEBUG_PRINTF("tty init");
-
   tty_t *tty = ttydev->ptr;
   tty->fbdev = dev->lookup("fb");
   fb_t *fb = tty->fbdev->ptr;
@@ -208,18 +205,9 @@ static int tty_init(device_t *ttydev) {
   tty->lines = fb->info->height / 16;
   tty->columns = fb->info->width / 8;
   tty->size = tty->columns * tty->lines;
-
-  DEBUG_PRINTF("alloc size: %d", tty->size * sizeof(tty->buf[0]));
-
   tty->buf = pmm->alloc(tty->size * sizeof(tty->buf[0]));
-
-  DEBUG_PRINTF("alloc size: %d", tty->size * sizeof(tty->dirty[0]));
-
   tty->dirty = pmm->alloc(tty->size * sizeof(tty->dirty[0]));
   tty->end = tty->buf + tty->size;
-
-  DEBUG_PRINTF("alloc size: %d",tty->size * 2 * sizeof(struct sprite));
-
   tty->sp_buf = pmm->alloc(tty->size * 2 * sizeof(struct sprite));
   for (int i = 0; i < tty->size; i++) {
     tty->buf[i] = tty_defaultch();
@@ -231,14 +219,7 @@ static int tty_init(device_t *ttydev) {
   q->end = q->buf + TTY_COOK_BUF_SZ;
   kmt->sem_init(&tty->lock, "tty lock", 1);
   kmt->sem_init(&tty->cooked, "tty cooked lines", 0);
-  
-  DEBUG_PRINTF("tty sem init end");
-
   welcome(ttydev);
-
-  DEBUG_PRINTF("tty init end");
-
-
   return 0;
 }
 

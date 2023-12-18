@@ -36,6 +36,7 @@ struct semaphore {
   struct spinlock lock;
   int count;
   const char *name;
+  task_t *wl; // waiting list
 };
 
 struct handler_table {

@@ -17,7 +17,7 @@ static int irq_nest[MAX_CPU];
 static int irq_istatus[MAX_CPU];
 
 // function declarations
-int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg);
+static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg);
 static void kmt_teardown(task_t *task);
 static void kmt_spin_init(spinlock_t *lk, const char *name);
 static void kmt_spin_lock(spinlock_t *lk);
@@ -29,37 +29,25 @@ Context *kmt_context_save(Event ev, Context *context);
 Context* kmt_schedule(Event ev, Context* context);
 static void kmt_init();
 
+static task_t* pop_task(task_status status);
+static void push_task(task_t *task, task_status status);
 //
 static int task_id = 1;
 
-int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg){
-
-    DEBUG_PRINTF(" kmt create!");
-
-
+static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg){
     task->status = TASK_READY; 
     task->name = name;
     task->next = NULL; // tail insert
-    task->stack = (void *)pmm->alloc(STACK_SIZE);
-    
-    DEBUG_PRINTF(" no room?");
-
+    task->stack = pmm->alloc(STACK_SIZE);
 
     // context
     Area kstack = (Area){ task->stack, task->stack + STACK_SIZE };
     task->context = kcontext(kstack, entry, arg);
 
     task->magic_number = 0x12345678;
-    task_header_t *p = task_head_table;
     kmt_spin_lock(spinlock_kmt); // get lock
     task->id = task_id++;
-
-    if(p->ready_task_tail == NULL){
-        p->ready_task_head = task;
-        p->ready_task_tail = task;
-    } else{
-        p->ready_task_tail->next = task;
-    }
+    push_task(task,task->status);
     kmt_spin_unlock(spinlock_kmt); // release
     
     return 0;
@@ -99,13 +87,13 @@ static void kmt_spin_init(spinlock_t *lk, const char *name){
 }
 
 static void kmt_spin_lock(spinlock_t *lk){
+    pushcli();
     while (1) {
         intptr_t value = atomic_xchg(&lk->lock, 1);
         if (value == 0) {
             break;
         }
     }
-    pushcli();
     lk->cpu = cpu_current();
 }
 
@@ -119,102 +107,104 @@ static void kmt_sem_init(sem_t *sem, const char *name, int value){
     kmt_spin_init(&sem->lock,name);
     sem->count = value;
     sem->name = name;
+    sem->wl = NULL;
 }
 
 static void kmt_sem_wait(sem_t *sem){
     kmt_spin_lock(&sem->lock);
-    while(sem->count == 0) {
+    if(sem->count == 0) {
         // need to sleep
-        // TODO: how to get this threads id??
-        // task->status = TASK_SLEEPING; then add to sleeping list;
-
-        // int cpu = cpu_current();
-        // assert(current_task[cpu] != NULL);
-        // current_task[cpu]->status = TASK_SLEEPING;
-        // kmt_spin_unlock(&sem->lock);
-        // yield();
-        // kmt_spin_lock(&sem->lock);
-
 
         // test version
+        assert(current_task[cpu_current()] != NULL);
+        // if is not a thread, illegal operation
+        task_t *p = sem->wl;
+        int cpu = cpu_current();
+        task_t *task = current_task[cpu];
+        while(p && p->next) p = p->next;
+        if(p == NULL){
+            sem->wl = task;
+        } else{
+            p->next = task;
+        }
+        task->next = NULL;
+        task->status = TASK_SLEEPING;
+
         kmt_spin_unlock(&sem->lock);
         yield();
-        kmt_spin_lock(&sem->lock);
-
+        return ;
     }
     sem->count--;
     kmt_spin_unlock(&sem->lock);
-    
-    // test 
-    DEBUG_PRINTF("no need to yield right?");
 
 }
 
 static void kmt_sem_signal(sem_t *sem){
 
-    // check if current task is available!!
-    if(current_task[cpu_current()] == NULL){
+    kmt_spin_lock(&sem->lock);
+    task_t *p = sem->wl;
 
-        kmt_spin_lock(&sem->lock);
+    // check if current task is available!!
+    if(current_task[cpu_current()] == NULL || p == NULL){
+
         assert(sem->count >= 0);
         sem->count++;
         kmt_spin_unlock(&sem->lock);
         return;
     }
 
-
-    task_header_t *p = task_head_table;
-    // first use big locker for task_head data
-    kmt_spin_lock(spinlock_kmt);
-
-    if(p->sleeping_task_head != NULL){
+    if(p != NULL){
         // need to wake up
-        task_t *task = p->sleeping_task_head;
-        task_t *next = task->next;
-        if(next == NULL){
-            p->sleeping_task_head = NULL;
-            p->sleeping_task_tail = NULL;
-        } else{
-            p->sleeping_task_head = next;
+
+        // first check if current task->status == sleeping
+        int cpu = cpu_current();
+        kmt_spin_lock(spinlock_kmt);
+
+        if(current_task[cpu]->status == TASK_SLEEPING){
+            task_t *ref_task = sem->wl;
+            task_t *last = NULL;
+            while(ref_task != NULL && ref_task != current_task[cpu]){
+                last = ref_task;
+                ref_task = ref_task->next;
+            }
+            if(ref_task == current_task[cpu]){
+                if(last == NULL){
+                    sem->wl = ref_task->next;
+                } else{
+                    last->next = ref_task->next;
+                }
+
+                ref_task->status = TASK_READY;
+                ref_task->next = NULL;
+                kmt_spin_lock(spinlock_kmt);
+                kmt_spin_unlock(&sem->lock);
+                return ;
+            }
         }
-
-        if(p->ready_task_tail == NULL){
-            p->ready_task_head = task;
-            task->next = NULL;
-            p->ready_task_tail = task;
-        } else{
-            p->ready_task_tail->next = task;
-            task->next = NULL;
-            p->ready_task_tail = task;
-        }
-
-        kmt_spin_unlock(spinlock_kmt);
-        yield();   
-    }
-    // when no waiting list, check if current[cpu]->status is sleeping
-
-    int istatus = current_task[cpu_current()]->status;
-    if(istatus == TASK_SLEEPING){
-        current_task[cpu_current()]->status = TASK_READY;
-        kmt_spin_unlock(spinlock_kmt);
-        yield();
-    } else{
         
-        kmt_spin_lock(&sem->lock);
-        sem->count++;
-        kmt_spin_unlock(&sem->lock);
+        sem->wl = p->next;
+        kmt_spin_lock(spinlock_kmt);
+        p->status = TASK_READY;
+        push_task(p,TASK_READY);
         kmt_spin_unlock(spinlock_kmt);
+        kmt_spin_unlock(&sem->lock);
+    
+        return ;
     }
+    
 }
 
 Context *kmt_context_save(Event ev, Context *context){
 
-    DEBUG_PRINTF("context_save");
-
-
-    // will do regardless of event number
     kmt_spin_lock(spinlock_kmt);
     int cpu = cpu_current();
+
+    DEBUG_PRINTF("context_save");
+    if(current_task[cpu] != NULL){
+        DEBUG_PRINTF("save task->name:%s",current_task[cpu]->name);
+    }
+
+    // will do regardless of event number
     if(current_task[cpu] != NULL){
         current_task[cpu]->context = context;
     }
@@ -225,14 +215,17 @@ Context *kmt_context_save(Event ev, Context *context){
 
 static void push_task(task_t *task, task_status status){
 
-    task_t *head, *tail;
-    assert(status == TASK_READY || status == TASK_SLEEPING);
+    if(status == TASK_SLEEPING)
+        return ;
 
-    if(status == TASK_READY){
+    task_t *head, *tail;
+    assert(status == TASK_RUNNING || status == TASK_SLEEPING || status == TASK_READY);
+    task->next = NULL;
+
+    if(status == TASK_RUNNING || status == TASK_READY){
         head = task_head_table->ready_task_head;
         tail = task_head_table->ready_task_tail;
         task->status = TASK_READY;
-        task->id = -1;
         if(tail != NULL){
             tail->next = task;
             task_head_table->ready_task_tail = task;
@@ -242,19 +235,6 @@ static void push_task(task_t *task, task_status status){
         }
     }  
 
-    if(status == TASK_SLEEPING){
-        head = task_head_table->sleeping_task_head;
-        tail = task_head_table->sleeping_task_tail;
-        task->status = TASK_SLEEPING;
-        task->id = -1;
-        if(tail != NULL){
-            tail->next = task;
-            tail = task;
-        } else{
-            head = task;
-            tail = task;
-        }
-    }
 }
 
 static task_t* pop_task(task_status status){
@@ -303,35 +283,48 @@ static task_t* pop_task(task_status status){
 Context* kmt_schedule(Event ev, Context* context){
     // check if ev is not for schedule, so no need to schedule
     int cpu = cpu_current();
-    if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER){
+    if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER || ev.event == EVENT_IRQ_IODEV){
         // schedule
         kmt_spin_lock(spinlock_kmt);
-        assert(current_task[cpu]->status != TASK_DEAD);
 
-        // first push task back to list
-        push_task(current_task[cpu], current_task[cpu]->status);
+        // first check if current task is NULL
+        if(current_task[cpu] != NULL){
+            assert(current_task[cpu]->status != TASK_DEAD);
+            // first push task back to list
+            push_task(current_task[cpu], current_task[cpu]->status);
+        }
+
         // then pop out a new task from ready list
         task_t *next_task = pop_task(TASK_READY);
+        assert(next_task != NULL);
+
         next_task->status = TASK_RUNNING;
-        next_task->id = cpu;
         assert(next_task->magic_number == 0x12345678);
         current_task[cpu] = next_task;
         kmt_spin_unlock(spinlock_kmt);
     }
 
-    DEBUG_PRINTF("kmt_schedule");
+    DEBUG_PRINTF("kmt_schedule. task->name:%s, task->context:%p",current_task[cpu]->name,current_task[cpu]->context);
+
+    task_t *p = task_head_table->ready_task_head;
+    while(p){
+        DEBUG_PRINTF("ready_list:%s",p->name);
+        p = p->next;
+    }
+    p = task_head_table->sleeping_task_head;
+    while(p){
+        DEBUG_PRINTF("sleeping_list:%s",p->name);
+        p = p->next;
+    }
 
     return current_task[cpu]->context;
 }
+
 
 static void kmt_init(){
 
     for(int i=0;i<MAX_CPU;i++){
         current_task[i] = NULL;
-    }
-
-    for(int i=0;i<MAX_CPU;i++){
-        
     }
 
     // register task head table
@@ -350,6 +343,7 @@ static void kmt_init(){
     // register irq task for context switch and task schedule
     os->on_irq(INT_MIN, EVENT_NULL,kmt_context_save);
     os->on_irq(INT_MAX, EVENT_NULL,kmt_schedule);
+
 }
 
 

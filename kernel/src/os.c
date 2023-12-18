@@ -1,23 +1,44 @@
 #include <common.h>
 #include <unistd.h>
+#include <devices.h>
 
-handler_table_t handler_head = {
+static handler_table_t handler_head = {
   .seq = 0,
   .event = 0,
   .handler = NULL,
   .next = NULL,
 };
 
+static void dead_loop(){
+    static int cnt = 0;
+    while(1){
+        printf("loop1, cnt:%d\n",cnt++);
+        yield();
+    }
+}
+
+static void tty_reader(void* arg) {
+  device_t* tty = dev->lookup(arg);
+  char cmd[128], resp[128], ps[16];
+  snprintf(ps, 16, "(%s) $ ", arg);
+  while (1) {
+    tty->ops->write(tty, 0, ps, strlen(ps));
+    int nread = tty->ops->read(tty, 0, cmd, sizeof(cmd) - 1);
+    cmd[nread] = '\0';
+    sprintf(resp, "tty reader task: got %d character(s).\n", strlen(cmd));
+    tty->ops->write(tty, 0, resp, strlen(resp));
+  }
+}
+
 
 static void os_init() {
   pmm->init();
-  printf("os0\n");
-
   kmt->init();
-  printf("os1\n");
-
   dev->init();
-  printf("os2\n");
+
+  kmt->create(pmm->alloc(sizeof(task_t)), "dead_loop", dead_loop, NULL);
+  // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty1");
+  // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty2");
 }
 
 
@@ -25,18 +46,28 @@ sem_t nest;
 spinlock_t put_lock;
 
 static void os_run() {
+
+  handler_table_t *p = handler_head.next;
+  while(p != NULL){
+    printf("seq: %d, event: %d\n",p->seq,p->event);
+    p = p->next;
+  }
+
+
   iset(true);
 
   int cpu = cpu_current();
   printf("Hello World! from CPU#%d\n",cpu);
 
+  yield();
+  assert(0);
 
   kmt->sem_init(&nest,"nest",0);
   kmt->spin_init(&put_lock,"put_lock");
 
   while(1){
 
-    if( cpu > 1){
+    if( cpu <= 1){
       kmt->sem_signal(&nest);
       kmt->spin_lock(&put_lock);
       putch('(');
@@ -44,12 +75,14 @@ static void os_run() {
     } else{
       kmt->sem_wait(&nest);
       kmt->spin_lock(&put_lock);
-      putch('(');
+      putch(')');
       kmt->spin_unlock(&put_lock);
     }
+
+    usleep(100000);
+
   }
 
-  usleep(100000);
 
 }
 
