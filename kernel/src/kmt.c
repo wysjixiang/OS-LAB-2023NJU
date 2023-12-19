@@ -93,6 +93,10 @@ static void kmt_spin_lock(spinlock_t *lk){
         if (value == 0) {
             break;
         }
+
+        // test
+        DEBUG_PRINTF("trying fetch lock:%s",lk->name);
+
     }
     lk->cpu = cpu_current();
 }
@@ -196,6 +200,9 @@ static void kmt_sem_signal(sem_t *sem){
 
 Context *kmt_context_save(Event ev, Context *context){
 
+
+    DEBUG_PRINTF("event = %d",ev.event);
+
     kmt_spin_lock(spinlock_kmt);
     int cpu = cpu_current();
 
@@ -283,8 +290,21 @@ static task_t* pop_task(task_status status){
 Context* kmt_schedule(Event ev, Context* context){
     // check if ev is not for schedule, so no need to schedule
     int cpu = cpu_current();
-    if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER || ev.event == EVENT_IRQ_IODEV){
+
+    // test
+    if(ev.event == EVENT_IRQ_TIMER) {
+        DEBUG_PRINTF("schedule from timer");
+    }
+
+    if(ev.event == EVENT_IRQ_IODEV) {
+        DEBUG_PRINTF("schedule from IODEV");
+    }
+
+
+    if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER){
         // schedule
+
+
         kmt_spin_lock(spinlock_kmt);
 
         // first check if current task is NULL

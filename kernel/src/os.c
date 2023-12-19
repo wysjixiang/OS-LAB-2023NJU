@@ -12,6 +12,9 @@ static handler_table_t handler_head = {
 static void dead_loop(){
     static int cnt = 0;
     while(1){
+        ;
+    }
+    while(1){
         printf("loop1, cnt:%d\n",cnt++);
         yield();
     }
@@ -46,13 +49,6 @@ sem_t nest;
 spinlock_t put_lock;
 
 static void os_run() {
-
-  handler_table_t *p = handler_head.next;
-  while(p != NULL){
-    printf("seq: %d, event: %d\n",p->seq,p->event);
-    p = p->next;
-  }
-
 
   iset(true);
 
