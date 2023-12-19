@@ -3,6 +3,7 @@ SRCS := $(wildcard src/*.c)
 SRCS += $(wildcard src/dev/*.c)
 SRCS += $(wildcard framework/*.c)
 #CFLAGS += -D__MEM_TEST
+CFLAGS += -DNO_DEBUG
 
 export MODULE  := L2
 export AM_HOME := $(PWD)/../abstract-machine

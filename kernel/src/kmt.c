@@ -144,7 +144,6 @@ static void kmt_sem_wait(sem_t *sem){
 }
 
 static void kmt_sem_signal(sem_t *sem){
-
     kmt_spin_lock(&sem->lock);
     task_t *p = sem->wl;
 
@@ -180,14 +179,13 @@ static void kmt_sem_signal(sem_t *sem){
 
                 ref_task->status = TASK_READY;
                 ref_task->next = NULL;
-                kmt_spin_lock(spinlock_kmt);
+                kmt_spin_unlock(spinlock_kmt);
                 kmt_spin_unlock(&sem->lock);
                 return ;
             }
         }
         
         sem->wl = p->next;
-        kmt_spin_lock(spinlock_kmt);
         p->status = TASK_READY;
         push_task(p,TASK_READY);
         kmt_spin_unlock(spinlock_kmt);
@@ -199,8 +197,6 @@ static void kmt_sem_signal(sem_t *sem){
 }
 
 Context *kmt_context_save(Event ev, Context *context){
-
-
     DEBUG_PRINTF("event = %d",ev.event);
 
     kmt_spin_lock(spinlock_kmt);
@@ -290,21 +286,16 @@ static task_t* pop_task(task_status status){
 Context* kmt_schedule(Event ev, Context* context){
     // check if ev is not for schedule, so no need to schedule
     int cpu = cpu_current();
-
     // test
-    if(ev.event == EVENT_IRQ_TIMER) {
-        DEBUG_PRINTF("schedule from timer");
-    }
-
-    if(ev.event == EVENT_IRQ_IODEV) {
-        DEBUG_PRINTF("schedule from IODEV");
-    }
-
+    // if(ev.event == EVENT_IRQ_TIMER) {
+    //     DEBUG_PRINTF("schedule from timer");
+    // }
+    // if(ev.event == EVENT_IRQ_IODEV) {
+    //     DEBUG_PRINTF("schedule from IODEV");
+    // }
 
     if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER){
         // schedule
-
-
         kmt_spin_lock(spinlock_kmt);
 
         // first check if current task is NULL
@@ -363,7 +354,6 @@ static void kmt_init(){
     // register irq task for context switch and task schedule
     os->on_irq(INT_MIN, EVENT_NULL,kmt_context_save);
     os->on_irq(INT_MAX, EVENT_NULL,kmt_schedule);
-
 }
 
 
