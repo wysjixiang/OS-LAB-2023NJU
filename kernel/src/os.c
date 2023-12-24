@@ -9,16 +9,6 @@ static handler_table_t handler_head = {
   .next = NULL,
 };
 
-static void dead_loop(){
-    static int cnt = 0;
-    while(1){
-        ;
-    }
-    while(1){
-        printf("loop1, cnt:%d\n",cnt++);
-        yield();
-    }
-}
 
 static void tty_reader(void* arg) {
   device_t* tty = dev->lookup(arg);
@@ -39,7 +29,6 @@ static void os_init() {
   kmt->init();
   dev->init();
 
-  kmt->create(pmm->alloc(sizeof(task_t)), "dead_loop", dead_loop, NULL);
   // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty1");
   // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty2");
 }
@@ -51,34 +40,13 @@ spinlock_t put_lock;
 static void os_run() {
 
   iset(true);
+  if(cpu_current() == 0) while(1);
 
   int cpu = cpu_current();
   printf("Hello World! from CPU#%d\n",cpu);
 
   yield();
   assert(0);
-
-  kmt->sem_init(&nest,"nest",0);
-  kmt->spin_init(&put_lock,"put_lock");
-
-  while(1){
-
-    if( cpu <= 1){
-      kmt->sem_signal(&nest);
-      kmt->spin_lock(&put_lock);
-      putch('(');
-      kmt->spin_unlock(&put_lock);
-    } else{
-      kmt->sem_wait(&nest);
-      kmt->spin_lock(&put_lock);
-      putch(')');
-      kmt->spin_unlock(&put_lock);
-    }
-
-    usleep(100000);
-
-  }
-
 
 }
 

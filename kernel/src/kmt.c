@@ -1,7 +1,7 @@
 #include <os.h>
 #include <limits.h>
 
-#define MAX_CPU 8
+#define MAX_CPU 2
 
 task_header_t *task_head_table;
 
@@ -32,6 +32,15 @@ static void kmt_init();
 static task_t* pop_task(task_status status);
 static void push_task(task_t *task, task_status status);
 //
+
+static void dead_loop(){
+    while(1){
+        ;
+    }
+}
+
+
+
 static int task_id = 1;
 
 static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg){
@@ -88,15 +97,18 @@ static void kmt_spin_init(spinlock_t *lk, const char *name){
 
 static void kmt_spin_lock(spinlock_t *lk){
     pushcli();
+    int cnt = 0;
     while (1) {
         intptr_t value = atomic_xchg(&lk->lock, 1);
         if (value == 0) {
             break;
         }
-
-        // test
-        DEBUG_PRINTF("trying fetch lock:%s",lk->name);
-
+        cnt++;
+        if(cnt > 1000){
+            // test
+            DEBUG_PRINTF("trying fetch lock:%s",lk->name);
+            cnt = 0;
+        }
     }
     lk->cpu = cpu_current();
 }
@@ -197,14 +209,15 @@ static void kmt_sem_signal(sem_t *sem){
 }
 
 Context *kmt_context_save(Event ev, Context *context){
+    kmt_spin_lock(spinlock_kmt);
+
     DEBUG_PRINTF("event = %d",ev.event);
 
-    kmt_spin_lock(spinlock_kmt);
     int cpu = cpu_current();
 
     DEBUG_PRINTF("context_save");
     if(current_task[cpu] != NULL){
-        DEBUG_PRINTF("save task->name:%s",current_task[cpu]->name);
+        DEBUG_PRINTF("save from CPU#%d, task->name:%s", cpu, current_task[cpu]->name);
     }
 
     // will do regardless of event number
@@ -317,6 +330,7 @@ Context* kmt_schedule(Event ev, Context* context){
 
     DEBUG_PRINTF("kmt_schedule. task->name:%s, task->context:%p",current_task[cpu]->name,current_task[cpu]->context);
 
+    kmt_spin_lock(spinlock_kmt);
     task_t *p = task_head_table->ready_task_head;
     while(p){
         DEBUG_PRINTF("ready_list:%s",p->name);
@@ -327,6 +341,7 @@ Context* kmt_schedule(Event ev, Context* context){
         DEBUG_PRINTF("sleeping_list:%s",p->name);
         p = p->next;
     }
+    kmt_spin_unlock(spinlock_kmt);
 
     return current_task[cpu]->context;
 }
@@ -354,6 +369,11 @@ static void kmt_init(){
     // register irq task for context switch and task schedule
     os->on_irq(INT_MIN, EVENT_NULL,kmt_context_save);
     os->on_irq(INT_MAX, EVENT_NULL,kmt_schedule);
+    
+
+    for(int i =0; i< MAX_CPU; i++){
+        kmt->create(pmm->alloc(sizeof(task_t)), "dead_loop for CPUS", dead_loop,NULL);
+    }
 }
 
 
