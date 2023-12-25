@@ -59,7 +59,7 @@ typedef struct spinlock spinlock_t;
 typedef struct semaphore sem_t;
 MODULE(kmt) {
   void (*init)();
-  int  (*create)(task_t *task, const char *name, void (*entry)(void *arg), void *arg);
+  int  (*create)(task_t *task, const char *name, void (*entry)(void *arg), void *arg, int bind_cpu);
   void (*teardown)(task_t *task);
   void (*spin_init)(spinlock_t *lk, const char *name);
   void (*spin_lock)(spinlock_t *lk);

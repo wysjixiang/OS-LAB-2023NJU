@@ -16,6 +16,7 @@ typedef enum {
 struct task {
   // TODO
   int id;
+  int bind_cpu;
   task_status status;
   const char *name;
   struct task *next;

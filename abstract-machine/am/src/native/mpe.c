@@ -24,6 +24,7 @@ bool mpe_init(void (*entry)()) {
     }
   }
 
+  // only cpu-0 has init ioe and the memory of ioe structures are not shared between threads!
   if (__am_has_ioe) {
     __am_ioe_init();
   }

@@ -17,7 +17,7 @@ static int irq_nest[MAX_CPU];
 static int irq_istatus[MAX_CPU];
 
 // function declarations
-static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg);
+static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg, int bind_cpu);
 static void kmt_teardown(task_t *task);
 static void kmt_spin_init(spinlock_t *lk, const char *name);
 static void kmt_spin_lock(spinlock_t *lk);
@@ -43,7 +43,8 @@ static void dead_loop(){
 
 static int task_id = 1;
 
-static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg){
+static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg, int bind_cpu){
+    task->bind_cpu = bind_cpu;
     task->status = TASK_READY; 
     task->name = name;
     task->next = NULL; // tail insert
@@ -103,8 +104,7 @@ static void kmt_spin_lock(spinlock_t *lk){
         if (value == 0) {
             break;
         }
-        cnt++;
-        if(cnt > 1000){
+        if(cnt++ > 1000){
             // test
             DEBUG_PRINTF("trying fetch lock:%s",lk->name);
             cnt = 0;
@@ -321,6 +321,14 @@ Context* kmt_schedule(Event ev, Context* context){
         task_t *next_task = pop_task(TASK_READY);
         assert(next_task != NULL);
 
+        // cpu-bind task 
+        //TODO:
+        while(next_task->bind_cpu != -1 && next_task->bind_cpu != cpu){
+            // push back to ready list
+            push_task(next_task, TASK_READY);
+            next_task = pop_task(TASK_READY);
+        }
+
         next_task->status = TASK_RUNNING;
         assert(next_task->magic_number == 0x12345678);
         current_task[cpu] = next_task;
@@ -371,7 +379,7 @@ static void kmt_init(){
     
 
     for(int i =0; i< MAX_CPU; i++){
-        kmt->create(pmm->alloc(sizeof(task_t)), "dead_loop for CPUS", dead_loop,NULL);
+        kmt->create(pmm->alloc(sizeof(task_t)), "dead_loop for CPUS", dead_loop,NULL, -1);
     }
 }
 

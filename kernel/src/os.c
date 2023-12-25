@@ -28,9 +28,8 @@ static void os_init() {
   pmm->init();
   kmt->init();
   dev->init();
-
-  // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty1");
-  // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty2");
+  // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty1",-1);
+  // kmt->create(pmm->alloc(sizeof(task_t)), "tty_reader", tty_reader, "tty2",-1);
 }
 
 
@@ -39,11 +38,10 @@ spinlock_t put_lock;
 
 static void os_run() {
 
-  if(cpu_current() == 1) while(1);
-  iset(true);
-
   int cpu = cpu_current();
   printf("Hello World! from CPU#%d\n",cpu);
+
+  iset(true);
 
   yield();
   assert(0);
