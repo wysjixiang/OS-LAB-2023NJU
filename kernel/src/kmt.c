@@ -214,7 +214,6 @@ Context *kmt_context_save(Event ev, Context *context){
     DEBUG_PRINTF("event = %d",ev.event);
 
     int cpu = cpu_current();
-
     DEBUG_PRINTF("context_save");
     if(current_task[cpu] != NULL){
         DEBUG_PRINTF("save from CPU#%d, task->name:%s", cpu, current_task[cpu]->name);

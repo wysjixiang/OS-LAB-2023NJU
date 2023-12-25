@@ -39,8 +39,8 @@ spinlock_t put_lock;
 
 static void os_run() {
 
+  if(cpu_current() == 1) while(1);
   iset(true);
-  if(cpu_current() == 0) while(1);
 
   int cpu = cpu_current();
   printf("Hello World! from CPU#%d\n",cpu);
