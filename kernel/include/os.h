@@ -3,7 +3,7 @@
 
 #include <common.h>
 
-#define STACK_SIZE 8192
+#define STACK_SIZE (8192*2)
 
 typedef enum {
   TASK_NULL = 0,

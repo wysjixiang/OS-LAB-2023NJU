@@ -24,6 +24,8 @@ static void tty_reader(void* arg) {
 }
 
 
+
+
 static void os_init() {
   pmm->init();
   kmt->init();
@@ -39,6 +41,7 @@ spinlock_t put_lock;
 static void os_run() {
 
   int cpu = cpu_current();
+
   printf("Hello World! from CPU#%d\n",cpu);
 
   iset(true);

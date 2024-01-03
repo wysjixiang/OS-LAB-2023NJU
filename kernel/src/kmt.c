@@ -1,7 +1,7 @@
 #include <os.h>
 #include <limits.h>
 
-#define MAX_CPU 2
+#define MAX_CPU 8
 
 task_header_t *task_head_table;
 
@@ -15,6 +15,7 @@ sem_t *sem_kmt = &sem_kmt_entity;
 task_t* current_task[MAX_CPU];
 static int irq_nest[MAX_CPU];
 static int irq_istatus[MAX_CPU];
+static task_t* buf_task[MAX_CPU];
 
 // function declarations
 static int kmt_create(task_t *task, const char *name, void (*entry)(void *arg), void *arg, int bind_cpu);
@@ -98,15 +99,17 @@ static void kmt_spin_init(spinlock_t *lk, const char *name){
 
 static void kmt_spin_lock(spinlock_t *lk){
     pushcli();
+    #define MAX_LOCK_FETCH_TIME 30000
     int cnt = 0;
     while (1) {
         intptr_t value = atomic_xchg(&lk->lock, 1);
         if (value == 0) {
             break;
         }
-        if(cnt++ > 1000){
+        if(cnt++ > MAX_LOCK_FETCH_TIME){
             // test
             DEBUG_PRINTF("trying fetch lock:%s",lk->name);
+            assert(0);
             cnt = 0;
         }
     }
@@ -298,36 +301,37 @@ static task_t* pop_task(task_status status){
 Context* kmt_schedule(Event ev, Context* context){
     // check if ev is not for schedule, so no need to schedule
     int cpu = cpu_current();
-    // test
-    // if(ev.event == EVENT_IRQ_TIMER) {
-    //     DEBUG_PRINTF("schedule from timer");
-    // }
-    // if(ev.event == EVENT_IRQ_IODEV) {
-    //     DEBUG_PRINTF("schedule from IODEV");
-    // }
 
-    if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER){
+
+    if(ev.event == EVENT_YIELD || ev.event == EVENT_IRQ_TIMER || ev.event == EVENT_IRQ_IODEV){
         // schedule
         kmt_spin_lock(spinlock_kmt);
 
         // first check if current task is NULL
         if(current_task[cpu] != NULL){
             assert(current_task[cpu]->status != TASK_DEAD);
-            // first push task back to list
-            push_task(current_task[cpu], current_task[cpu]->status);
+            
+            if(current_task[cpu]->bind_cpu != -2){
+                // first push task back to list
+                push_task(current_task[cpu], current_task[cpu]->status);
+            }
         }
 
         // then pop out a new task from ready list
         task_t *next_task = pop_task(TASK_READY);
-        assert(next_task != NULL);
+
+        // test
+        if(next_task == NULL){
+            next_task = buf_task[cpu];
+        } 
 
         // cpu-bind task 
         //TODO:
-        while(next_task->bind_cpu != -1 && next_task->bind_cpu != cpu){
-            // push back to ready list
-            push_task(next_task, TASK_READY);
-            next_task = pop_task(TASK_READY);
-        }
+        // while(next_task->bind_cpu != -1 && next_task->bind_cpu != cpu){
+        //     // push back to ready list
+        //     push_task(next_task, TASK_READY);
+        //     next_task = pop_task(TASK_READY);
+        // }
 
         next_task->status = TASK_RUNNING;
         assert(next_task->magic_number == 0x12345678);
@@ -343,21 +347,47 @@ Context* kmt_schedule(Event ev, Context* context){
         DEBUG_PRINTF("ready_list:%s",p->name);
         p = p->next;
     }
-    p = task_head_table->sleeping_task_head;
-    while(p){
-        DEBUG_PRINTF("sleeping_list:%s",p->name);
-        p = p->next;
-    }
     kmt_spin_unlock(spinlock_kmt);
 
     return current_task[cpu]->context;
 }
 
+static void thread_test_20(void *arg){
+  while(1){
+    int cpu = cpu_current();
+    printf("cpu#%d calling!\n",cpu);
+    // usleep(500000);
+
+    // *****************
+    // why usleep() function will let system timer disable?
+  }
+}
+
+static void thread_test1(void *arg){
+  while(1){
+    int cpu = cpu_current();
+    printf("cpu#%d threading!\n",cpu);
+  }
+}
 
 static void kmt_init(){
 
     for(int i=0;i<MAX_CPU;i++){
         current_task[i] = NULL;
+    }
+
+    for(int i=0; i < MAX_CPU;i++){
+        buf_task[i] = (task_t*)pmm->alloc(sizeof(task_t));
+        buf_task[i]->bind_cpu = -2;
+        buf_task[i]->status = TASK_READY; 
+        buf_task[i]->name = "dead_loop per cpu";
+        buf_task[i]->next = NULL; // tail insert
+        buf_task[i]->stack = pmm->alloc(STACK_SIZE);
+
+        // context
+        Area kstack = (Area){ buf_task[i]->stack, buf_task[i]->stack + STACK_SIZE };
+        buf_task[i]->context = kcontext(kstack, dead_loop, NULL);
+        buf_task[i]->magic_number = 0x12345678;
     }
 
     // register task head table
@@ -376,11 +406,15 @@ static void kmt_init(){
     // register irq task for context switch and task schedule
     os->on_irq(INT_MIN, EVENT_NULL,kmt_context_save);
     os->on_irq(INT_MAX, EVENT_NULL,kmt_schedule);
-    
 
-    for(int i =0; i< MAX_CPU; i++){
-        kmt->create(pmm->alloc(sizeof(task_t)), "dead_loop for CPUS", dead_loop,NULL, -1);
-    }
+    // task_t *p = task_head_table->ready_task_head;
+    // int cnt = 0;
+    // p = pop_task(TASK_READY);
+    // printf("ready_list:\n");
+    // while(p){
+    //     printf("No.%d:%s\n",cnt++,p->name);
+    //     p = pop_task(TASK_READY);
+    // }
 }
 
 

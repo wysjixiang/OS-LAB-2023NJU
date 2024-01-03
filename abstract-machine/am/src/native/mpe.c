@@ -28,6 +28,7 @@ bool mpe_init(void (*entry)()) {
   if (__am_has_ioe) {
     __am_ioe_init();
   }
+  // 
 
   for (int i = 1; i < cpu_count(); i++) {
     assert(write(sync_pipe[1], "+", 1) == 1);
